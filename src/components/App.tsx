@@ -1,14 +1,14 @@
-import React from 'react';
-import { Text, View } from 'react-native';
+import React, { useState } from 'react';
+import PuzzleBoard from './PuzzleBoard';
 
 type Props = {}
 
 const App = (props: Props) => {
    return (
-      <View>
-         <Text>app</Text>
-      </View>
+      <PuzzleBoard />
    );
 }
+
+
 
 export default App;
