@@ -1,6 +1,12 @@
 import { Image, StyleSheet, TouchableOpacity, View } from 'react-native'
 import React, { useState } from 'react'
-import { shuffle, tileX, tileY, useBoard } from '@/utils/puzzleUtils';
+import { isAdj, shuffle, tileX, tileY, useBoard } from '@/utils/puzzleUtils';
+
+interface State {
+   boardArray: number[];
+   selected: number | null;
+   solved: boolean;
+}
 
 type Props = {}
 
@@ -11,7 +17,44 @@ const PuzzleBoard = (props: Props) => {
 
    const board = useBoard(N);
 
-   const [state, setState] = useState(() => shuffle([...Array(N*N).keys()], N));
+   const [state, setState] = useState<State>({
+      boardArray: shuffle([...Array(N*N).keys()], N),
+      selected: null,
+      solved: false,
+   });
+
+   /**
+    * Handles a tile press during the puzzle game.
+    * Highlights the selected tile and swaps the two last selected tiles
+    * if they are adjacent.
+    * @param boardIndex - The board index of the pressed tile (0 to N*N-1)
+    */
+   const handlePress = (boardIndex: number) => {
+      if (!state.solved) {
+         let selected = state.selected;
+         let newBoard = [...state.boardArray];
+         let solved = false;
+         if (selected === null) {
+            selected = boardIndex;
+         } else if (selected === boardIndex) {
+            selected = null;
+         } else if (isAdj(selected, boardIndex, N)) {
+            [newBoard[selected], newBoard[boardIndex]] = [newBoard[boardIndex], newBoard[selected]];
+            selected = null;
+            if (newBoard.every((v, i) => v === i)) {
+               solved = true;
+            }
+         } else {
+            selected = boardIndex;
+         }
+         setState({
+            ...state,
+            boardArray: newBoard,
+            solved: solved,
+            selected: selected,
+         });
+      }
+   }
 
    return (
       <View style={[
@@ -21,10 +64,10 @@ const PuzzleBoard = (props: Props) => {
             height: board.boardHeight,
          }
       ]}>
-         {state.map((tileVal, tileIndex) => (
+         {state.boardArray.map((tileVal, tileIndex) => (
             <TouchableOpacity
                key={tileIndex}
-               //onPress={() => handlePress(tileIndex)}
+               onPress={() => handlePress(tileIndex)}
                style={[
                   styles.tile,
                   {
@@ -33,8 +76,7 @@ const PuzzleBoard = (props: Props) => {
                      left: tileX(tileIndex, board),
                      top:  tileY(tileIndex, board),
                      borderWidth: board.tileBoarderWidth,
-                     borderColor: 'transparent',
-                     //borderColor: tileIndex === selected ? '#4a90ff' : 'transparent',
+                     borderColor: tileIndex === state.selected ? '#4a90ff' : 'transparent',
                   }
                ]}
             >
