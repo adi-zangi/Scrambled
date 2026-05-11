@@ -1,12 +1,19 @@
+/**
+ * Puzzle utility functions for grid position, adjacency, sizing, and shuffle logic.
+ */
+
 import { useWindowDimensions } from "react-native";
 
+/**
+ * Dimensions of an N x N puzzle board and its tiles in pixels.
+ */
 export interface Board {
    N: number;
    boardWidth: number;
    boardHeight: number;
    tileWidth: number;
    tileHeight: number;
-   tileBoarderWidth: number;
+   tileBorderWidth: number;
 }
 
 /**
@@ -24,7 +31,7 @@ const useBoard = (N: number): Board => {
       boardHeight: 0,
       tileWidth: 0,
       tileHeight: 0,
-      tileBoarderWidth: 2,
+      tileBorderWidth: 2,
    };
 
    const { width, height } = useWindowDimensions();
@@ -43,11 +50,11 @@ const useBoard = (N: number): Board => {
       board.boardWidth = (imageWidth / imageHeight) * board.boardHeight;
    }
 
-   // Tile size derived from board as exact integers
-   board.tileWidth = Math.floor(board.boardWidth / N) + (board.tileBoarderWidth * 2);
-   board.tileHeight = Math.floor(board.boardHeight / N) + (board.tileBoarderWidth * 2);
+   // Tile size derived from board size and tile border as exact integers
+   board.tileWidth = Math.floor(board.boardWidth / N) + (board.tileBorderWidth * 2);
+   board.tileHeight = Math.floor(board.boardHeight / N) + (board.tileBorderWidth * 2);
 
-   // Recalculate board from tile to avoid rounding gaps
+   // Recalculate board size from tile to include the borders
    board.boardWidth = board.tileWidth * N;
    board.boardHeight = board.tileHeight * N;
 
@@ -136,7 +143,23 @@ const isAdj = (a: any, b: any, N: number): boolean => {
    const vertical   = sameCol && oneRowApart;
 
    return horizontal || vertical;
-};
+}
 
-export { shuffle, tileX, tileY, useBoard, isAdj };
+/**
+* Converts an x/y pixel position on the board to a board index.
+* @param x     - X position in pixels from the left edge of the board
+* @param y     - Y position in pixels from the top edge of the board
+* @param board - The Board object
+* @returns Board index or -1 if outside the board
+*/
+const indexFromPos = (x: number, y: number, board: Board): number => {
+   const col = Math.floor(x / board.tileWidth);
+   const row = Math.floor(y / board.tileHeight);
+   if (col < 0 || col >= board.N || row < 0 || row >= board.N) {
+      return -1;
+   }
+   return row * board.N + col;
+}
+
+export { shuffle, tileX, tileY, useBoard, isAdj, indexFromPos };
 

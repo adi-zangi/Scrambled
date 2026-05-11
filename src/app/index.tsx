@@ -1,3 +1,7 @@
+/**
+ * App entry point. Registers the root App component with Expo.
+ */
+
 import App from "@/components/App";
 import { StyleSheet, View } from "react-native";
 
