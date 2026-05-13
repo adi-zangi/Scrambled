@@ -2,12 +2,18 @@
  * Interactive puzzle board. Handles tile swapping, win detection, and move tracking.
  */
 
-import { Image, StyleSheet, View } from 'react-native'
-import React, { useState } from 'react'
-import { indexFromPos, isAdj, shuffle, tileX, tileY, useBoard } from '@/utils/puzzleUtils';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import { Gesture, GestureDetector, PanGesture } from 'react-native-gesture-handler';
+import { Image, StyleSheet, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Board, getGridSize, indexFromPos, isAdj, shuffle, tileX, tileY, useBoard } from '@/utils/puzzleUtils';
+import Animated, { SharedValue, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import { ComposedGesture, Gesture, GestureDetector, GestureType, PanGesture } from 'react-native-gesture-handler';
+import { getImage } from '@/utils/imageUtils';
 const AnimatedImage = Animated.createAnimatedComponent(Image);
+
+interface Props {
+   level: number;
+   onPuzzleSolved: () => void;
+}
 
 interface State {
    boardArray: number[];
@@ -15,17 +21,36 @@ interface State {
    solved: boolean;
 }
 
-type Props = {}
+interface DragState {
+  isDragging:      SharedValue<boolean>;
+  dragBoardIndex:  SharedValue<number>;
+  dragTileVal:     SharedValue<number>;
+  dragTargetIndex: SharedValue<number>;
+  dragX:           SharedValue<number>;
+  dragY:           SharedValue<number>;
+}
+
+interface TileProps {
+  boardIndex: number;
+  tileVal:    number;
+  board:      Board;
+  imageUri:   string;
+  gesture:    ComposedGesture | GestureType;
+  dragState:  DragState;
+  state:      State;
+  isTutorial: boolean;
+  N:          number;
+}
 
 const PuzzleBoard = (props: Props) => {
-   const N = 4;
+   const { level } = props;
 
-   const imageUri = 'https://res.cloudinary.com/scrambled/image/upload/v1778374693/otter_unszkv.png';
-
-   const board = useBoard(N);
+   const N = getGridSize(level);
+   const image = getImage(level);
+   const board = useBoard(image, N);
 
    const [state, setState] = useState<State>({
-      boardArray: shuffle([...Array(N*N).keys()], N),
+      boardArray: [],
       selected: null,
       solved: false,
    });
@@ -37,6 +62,24 @@ const PuzzleBoard = (props: Props) => {
    const dragTileVal      = useSharedValue(-1);
    const dragTargetIndex  = useSharedValue(-1);
    const isDragging       = useSharedValue(false);
+
+   const dragState: DragState = {
+      dragX,
+      dragY,
+      dragBoardIndex,
+      dragTileVal,
+      dragTargetIndex,
+      isDragging,
+   };
+
+   // Handles initial board setup and level changes
+   useEffect(() => {
+      setState({
+         boardArray: shuffle(Array.from({ length: N * N }, (_, i) => i), N),
+         selected:   null,
+         solved:     false,
+      });
+   }, [level]);
 
    /**
     * Swaps two tiles on the board.
@@ -52,6 +95,7 @@ const PuzzleBoard = (props: Props) => {
       [newBoard[fromIndex], newBoard[toIndex]] = [newBoard[toIndex], newBoard[fromIndex]];
       if (newBoard.every((v, i) => v === i)) {
          solved = true;
+         props.onPuzzleSolved();
       }
       setState({
          ...state,
@@ -156,34 +200,11 @@ const PuzzleBoard = (props: Props) => {
          });
    }
 
-   /**
-    * Returns an animated style for a tile based on its drag state.
-    * Dims the source tile and highlights the target tile.
-    * @param boardIndex - The board index of the tile
-    * @returns Animated style object for the tile
-    */
-   const makeTileStyle = (boardIndex: number) =>
-      useAnimatedStyle(() => {
-         const isSource = isDragging.value && dragBoardIndex.value === boardIndex;
-         const isTarget = isDragging.value && dragTargetIndex.value === boardIndex;
-         const isSelected = boardIndex === state.selected;
-
-         return {
-            opacity:     isSource ? 0.4 : 1,
-            borderWidth: isTarget || isSelected ? 3 : board.tileBorderWidth,
-            borderColor: isTarget
-               ? '#4cd964'
-               : isSelected
-                  ? '#4a90ff'
-                  : 'transparent',
-         };
-   });
-
+   // Animates the ghost tile's position and visibility while dragging.
    const ghostAnimatedStyle = useAnimatedStyle(() => ({
       left:      dragX.value,
       top:       dragY.value,
       opacity:   isDragging.value ? 0.85 : 0,
-      transform: [{ scale: withSpring(isDragging.value ? 1.08 : 1) }],
    }));
 
    return (
@@ -196,40 +217,20 @@ const PuzzleBoard = (props: Props) => {
             }
          ]}
       >
-         {state.boardArray.map((tileVal, boardIndex) => {
-            const gesture = createTileGesture(boardIndex);
-            const tileAnimatedStyle = makeTileStyle(boardIndex);
-
-            return (
-               <GestureDetector key={boardIndex} gesture={gesture}>
-                  <Animated.View
-                     style={[
-                        styles.tile,
-                        {
-                           width:  board.tileWidth,
-                           height: board.tileHeight,
-                           left:   tileX(boardIndex, board),
-                           top:    tileY(boardIndex, board),
-                        },
-                        tileAnimatedStyle,
-                     ]}
-                  >
-                     <Image
-                        source={{ uri: imageUri }}
-                        style={[
-                           {
-                              width:    board.boardWidth,
-                              height:   board.boardHeight,
-                              position: 'absolute',
-                              left:     -tileX(tileVal, board),
-                              top:      -tileY(tileVal, board),
-                           }
-                        ]}
-                     />
-                  </Animated.View>
-               </GestureDetector>
-            );
-         })}
+         {state.boardArray.map((tileVal, boardIndex) => (
+            <PuzzleTile
+               key={boardIndex}
+               boardIndex={boardIndex}
+               tileVal={tileVal}
+               board={board}
+               imageUri={image.uri}
+               gesture={createTileGesture(boardIndex)}
+               dragState={dragState}
+               state={state}
+               isTutorial={level === 0}
+               N={N}
+            />
+         ))}
 
          <Animated.View
             style={[
@@ -240,7 +241,7 @@ const PuzzleBoard = (props: Props) => {
             pointerEvents="none"
          >
             <AnimatedImage
-               source={{ uri: imageUri }}
+               source={{ uri: image.uri }}
                style={useAnimatedStyle(() => ({
                   width:    board.boardWidth,
                   height:   board.boardHeight,
@@ -251,6 +252,88 @@ const PuzzleBoard = (props: Props) => {
             />
          </Animated.View>
       </View>
+   );
+}
+
+/**
+ * Renders a single puzzle tile with animated drag and selection styles.
+ */
+const PuzzleTile = (props: TileProps) => {
+   const {
+      boardIndex,
+      tileVal,
+      board,
+      imageUri,
+      gesture,
+      dragState,
+      state,
+      isTutorial,
+      N,
+   } = props;
+
+   
+   /**
+    * Animates the tile's style based on its drag and selection state.
+    * In tutorial mode, dims the source tile and highlights the valid targets.
+    * When not in tutorial mode, adds a static transparent border with no animation.
+    */
+   const tileAnimatedStyle =
+      useAnimatedStyle(() => {
+         if (!isTutorial) {
+            return {
+               borderWidth: board.tileBorderWidth,
+               borderColor: 'transparent',
+            };
+         }
+
+         const dragging      = dragState.isDragging.value;
+         const isSource      = dragging && dragState.dragBoardIndex.value  === boardIndex;
+         const isValidTarget = dragging && dragState.dragTargetIndex.value === boardIndex;
+         const isSelected    = !dragging && boardIndex === state.selected;
+         const isAdjacent    = !dragging
+                              && state.selected !== null
+                              && isAdj(state.selected, boardIndex, N)
+                              && boardIndex !== state.selected;
+
+         return {
+            opacity:     isSource ? 0.4 : 1,
+            borderWidth: isValidTarget || isAdjacent || isSelected ? 3 : board.tileBorderWidth,
+            borderColor: isValidTarget || isAdjacent
+               ? '#4cd964'
+               : isSelected
+                  ? '#4a90ff'
+                  : 'transparent',
+         };
+   });
+
+   return (
+      <GestureDetector key={boardIndex} gesture={gesture}>
+         <Animated.View
+            style={[
+               styles.tile,
+               {
+                  width:  board.tileWidth,
+                  height: board.tileHeight,
+                  left:   tileX(boardIndex, board),
+                  top:    tileY(boardIndex, board),
+               },
+               tileAnimatedStyle,
+            ]}
+         >
+            <Image
+               source={{ uri: imageUri }}
+               style={[
+                  {
+                     width:    board.boardWidth,
+                     height:   board.boardHeight,
+                     position: 'absolute',
+                     left:     -tileX(tileVal, board),
+                     top:      -tileY(tileVal, board),
+                  }
+               ]}
+            />
+         </Animated.View>
+      </GestureDetector>
    );
 }
 

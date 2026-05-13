@@ -3,6 +3,7 @@
  */
 
 import { useWindowDimensions } from "react-native";
+import { Image } from "./imageUtils";
 
 /**
  * Dimensions of an N x N puzzle board and its tiles in pixels.
@@ -17,13 +18,23 @@ export interface Board {
 }
 
 /**
+ * Returns the grid size (N) for a given level number.
+ * @param level - The level number (0-based)
+ * @returns The number of columns and rows in the grid
+ */
+const getGridSize = (level: number): number => {
+  if (level === 0) return 3;  // 3X3 — tutorial
+  return 4;
+};
+
+/**
  * Calculates the board and tile pixel dimensions to fit a given image
  * within the available screen space while preserving its aspect ratio.
- * @param imageUri - URI of the puzzle image
- * @param N        - The number of columns (and rows) in the grid
+ * @param image - An image object
+ * @param N     - The number of columns (and rows) in the grid
  * @returns A Board object
  */
-const useBoard = (N: number): Board => {
+const useBoard = (image: Image, N: number): Board => {
    const board =
    {
       N: N,
@@ -35,19 +46,19 @@ const useBoard = (N: number): Board => {
    };
 
    const { width, height } = useWindowDimensions();
-   const maxWidth  = width  * 0.5;
-   const maxHeight = height * 0.5;
+   const maxWidth  = width  * 0.8;
+   const maxHeight = height * 0.8;
 
-   const imageWidth = 1344;
-   const imageHeight = 1008;
+   const imageWidth = image.width;
+   const imageHeight = image.height;
 
    // Fit the board inside available space, preserving image ratio
-   if (imageWidth > imageHeight) {
-      board.boardWidth = maxWidth;
-      board.boardHeight = (imageHeight / imageWidth) * board.boardWidth;
-   } else {
+   if (maxWidth > maxHeight) {
       board.boardHeight = maxHeight;
       board.boardWidth = (imageWidth / imageHeight) * board.boardHeight;
+   } else {
+      board.boardWidth = maxWidth;
+      board.boardHeight = (imageHeight / imageWidth) * board.boardWidth;
    }
 
    // Tile size derived from board size and tile border as exact integers
@@ -70,17 +81,27 @@ const useBoard = (N: number): Board => {
  */
 const shuffle = (arr: number[], N: number): number[] => {
   const a = [...arr];
+  const total = N * N;
+  const swaps = total * 20;
+
   // Build from solved state via random adjacent swaps
-  for (let k = 0; k < 300; k++) {
-    const i = Math.floor(Math.random() * 16);
-    const neighbors = [];
-    if (i % N > 0)    neighbors.push(i - 1);
-    if (i % N < N-1)  neighbors.push(i + 1);
-    if (i >= N)       neighbors.push(i - N);
-    if (i < 16 - N)   neighbors.push(i + N);
-    const j = neighbors[Math.floor(Math.random() * neighbors.length)];
-    [a[i], a[j]] = [a[j], a[i]];
+  for (let k = 0; k < swaps; k++) {
+      const i = Math.floor(Math.random() * total);
+      const neighbors = [];
+      if (i % N > 0)       neighbors.push(i - 1);
+      if (i % N < N-1)     neighbors.push(i + 1);
+      if (i >= N)          neighbors.push(i - N);
+      if (i < total - N)   neighbors.push(i + N);
+      const j = neighbors[Math.floor(Math.random() * neighbors.length)];
+      [a[i], a[j]] = [a[j], a[i]];
   }
+
+  // Guarantee not accidentally solved
+  if (arr.every((v, i) => v === i)) {
+      [arr[0], arr[1]] = [arr[1], arr[0]];
+      [arr[N], arr[N + 1]] = [arr[N + 1], arr[N]];
+  }
+
   return a;
 }
 
@@ -161,5 +182,5 @@ const indexFromPos = (x: number, y: number, board: Board): number => {
    return row * board.N + col;
 }
 
-export { shuffle, tileX, tileY, useBoard, isAdj, indexFromPos };
+export { shuffle, tileX, tileY, useBoard, isAdj, indexFromPos, getGridSize };
 
