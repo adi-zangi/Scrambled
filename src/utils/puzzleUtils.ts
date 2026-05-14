@@ -3,7 +3,7 @@
  */
 
 import { useWindowDimensions } from "react-native";
-import { Image } from "./imageUtils";
+import { PuzzleImage } from "./imageUtils";
 
 /**
  * Dimensions of an N x N puzzle board and its tiles in pixels.
@@ -30,11 +30,11 @@ const getGridSize = (level: number): number => {
 /**
  * Calculates the board and tile pixel dimensions to fit a given image
  * within the available screen space while preserving its aspect ratio.
- * @param image - An image object
+ * @param image - A PuzzleImage object
  * @param N     - The number of columns (and rows) in the grid
  * @returns A Board object
  */
-const useBoard = (image: Image, N: number): Board => {
+const useBoard = (image: PuzzleImage, N: number): Board => {
    const board =
    {
       N: N,
@@ -46,8 +46,8 @@ const useBoard = (image: Image, N: number): Board => {
    };
 
    const { width, height } = useWindowDimensions();
-   const maxWidth  = width  * 0.8;
-   const maxHeight = height * 0.8;
+   const maxWidth  = width  * 0.95;
+   const maxHeight = height * 0.95;
 
    const imageWidth = image.width;
    const imageHeight = image.height;
@@ -112,6 +112,7 @@ const shuffle = (arr: number[], N: number): number[] => {
  * @returns Row index (0 to N-1), starting from the top
  */
 const getRow = (i: number, N: number): number => {
+   'worklet';
    return Math.floor(i / N);
 }
 
@@ -122,6 +123,7 @@ const getRow = (i: number, N: number): number => {
  * @returns Column index (0 to N-1), starting from the left
  */
 const getCol = (i: number, N: number): number => {
+   'worklet';
    return i % N;
 }
 
@@ -132,6 +134,7 @@ const getCol = (i: number, N: number): number => {
  * @returns X position in pixels from the left edge of the board
  */
 const tileX = (i: number, board: Board): number => {
+   'worklet';
    return getCol(i, board.N) * board.tileWidth;
 }
 
@@ -142,6 +145,7 @@ const tileX = (i: number, board: Board): number => {
  * @returns Y position in pixels from the top edge of the board
  */
 const tileY = (i: number, board: Board): number => {
+   'worklet';
    return getRow(i, board.N) * board.tileHeight;
 }
 
@@ -155,6 +159,7 @@ const tileY = (i: number, board: Board): number => {
  * @returns True if the two positions are directly next to each other
  */
 const isAdj = (a: any, b: any, N: number): boolean => {
+   'worklet';
    const sameRow     = getRow(a, N) === getRow(b, N);
    const sameCol     = getCol(a, N) === getCol(b, N);
    const oneRowApart = Math.abs(getRow(a, N) - getRow(b, N)) === 1;
@@ -174,6 +179,7 @@ const isAdj = (a: any, b: any, N: number): boolean => {
 * @returns Board index or -1 if outside the board
 */
 const indexFromPos = (x: number, y: number, board: Board): number => {
+   'worklet';
    const col = Math.floor(x / board.tileWidth);
    const row = Math.floor(y / board.tileHeight);
    if (col < 0 || col >= board.N || row < 0 || row >= board.N) {

@@ -2,14 +2,14 @@
  * Image utility functions for fetching, caching, and building Cloudinary URLs.
  */
 
-export interface Image {
+export interface PuzzleImage {
    uri: string;
    desc: string;
    width: number;
    height: number;
 }
 
-const getImage = (level: number): Image => {
+const getImage = (level: number): PuzzleImage => {
    if (level === 0) {
       return {
             uri: 'https://res.cloudinary.com/scrambled/image/upload/v1778559544/tea_e9qcrk.jpg',

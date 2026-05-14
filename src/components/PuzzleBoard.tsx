@@ -4,14 +4,18 @@
 
 import { Image, StyleSheet, View } from 'react-native';
 import React, { useEffect, useState } from 'react';
-import { Board, getGridSize, indexFromPos, isAdj, shuffle, tileX, tileY, useBoard } from '@/utils/puzzleUtils';
+import { Board, indexFromPos, isAdj, shuffle, tileX, tileY } from '@/utils/puzzleUtils';
 import Animated, { SharedValue, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { ComposedGesture, Gesture, GestureDetector, GestureType, PanGesture } from 'react-native-gesture-handler';
-import { getImage } from '@/utils/imageUtils';
+import { PuzzleImage } from '@/utils/imageUtils';
+import { runOnJS } from 'react-native-worklets';
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 interface Props {
    level: number;
+   image: PuzzleImage;
+   board: Board;
+   gridSize: number;
    onPuzzleSolved: () => void;
 }
 
@@ -43,11 +47,8 @@ interface TileProps {
 }
 
 const PuzzleBoard = (props: Props) => {
-   const { level } = props;
-
-   const N = getGridSize(level);
-   const image = getImage(level);
-   const board = useBoard(image, N);
+   const { level, image, board } = props;
+   const N = props.gridSize;
 
    const [state, setState] = useState<State>({
       boardArray: [],
@@ -148,7 +149,7 @@ const PuzzleBoard = (props: Props) => {
          .enabled(!state.solved)
          .onEnd(() => {
             'worklet';
-            handlePress(boardIndex);
+            runOnJS(handlePress)(boardIndex);
          });
 
       const pan = createPanGesture(boardIndex);
@@ -192,7 +193,7 @@ const PuzzleBoard = (props: Props) => {
             const landY       = tileY(boardIndex, board) + e.translationY + board.tileHeight / 2;
             const targetIndex = indexFromPos(landX, landY, board);
             if (targetIndex >= 0 && targetIndex !== boardIndex) {
-               doSwap(boardIndex, targetIndex);
+               runOnJS(doSwap)(boardIndex, targetIndex);
             }
             isDragging.value     = false;
             dragBoardIndex.value = -1;

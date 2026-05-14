@@ -5,16 +5,21 @@
 import React, { useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import PuzzleBoard from './PuzzleBoard';
-import { getImage, Image } from '@/utils/imageUtils';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { getImage, PuzzleImage } from '@/utils/imageUtils';
+import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions, ViewStyle } from 'react-native';
+import { getGridSize, useBoard } from '@/utils/puzzleUtils';
 
 type Props = {}
 
 interface State {
    level: number;
-   image: Image;
+   image: PuzzleImage;
    message: string;
    showButton: boolean;
+}
+
+interface LevelMenuBtnProps {
+   level: number;
 }
 
 interface MessageBarProps {
@@ -30,6 +35,11 @@ const App = (props: Props) => {
       message: "Drag or click two adjacent tiles to swap",
       showButton: false,
    });
+
+   const gridSize = getGridSize(state.level);
+   const board = useBoard(state.image, gridSize);
+
+   const { width } = useWindowDimensions();
 
    const onPuzzleSolved = () => {
       setState({
@@ -49,18 +59,81 @@ const App = (props: Props) => {
       });
    }
 
+   const containerStyle: ViewStyle = {
+      flex:          1,
+      flexDirection: 'row',
+   };
+
+   const topBarStyle: ViewStyle = {
+      width:          (width - board.boardWidth) / 2,
+      height:         '100%',
+      paddingTop:     32,
+      paddingLeft:    32,
+      alignItems:     'flex-start',
+      justifyContent: 'flex-start',
+      flexShrink:     0,
+   };
+
+   const puzzleContainerStyle: ViewStyle = {
+      justifyContent: 'center',
+      alignItems:     'center',
+   };
+
+   const messageBarStyle: ViewStyle = {
+      width:          (width - board.boardWidth) / 2,
+      height:         '100%',
+      paddingRight:   56,
+      alignItems:     'flex-start',
+      justifyContent: 'center',
+      flexShrink:     0,
+   };
+
    return (
-      <GestureHandlerRootView>
-         <PuzzleBoard
-            level={state.level}
-            onPuzzleSolved={onPuzzleSolved}
-         />
-         <MessageBar
-            message={state.message}
-            showButton={state.showButton}
-            onNextLevel={onNextLevel}
-         />
+      <GestureHandlerRootView style={styles.root}>
+         <View style={containerStyle}>
+            <View style={topBarStyle}>
+               <LevelMenuButton
+                  level={state.level}
+               />
+            </View>
+            <View style={puzzleContainerStyle}>
+               <PuzzleBoard
+                  level={state.level}
+                  image={state.image}
+                  board={board}
+                  gridSize={gridSize}
+                  onPuzzleSolved={onPuzzleSolved}
+               />
+            </View>
+            <View style={messageBarStyle}>
+               <MessageBar
+                  message={state.message}
+                  showButton={state.showButton}
+                  onNextLevel={onNextLevel}
+               />
+            </View>
+         </View>
       </GestureHandlerRootView>
+   );
+}
+
+/**
+ * Renders a button displaying the current level number.
+ * Tapping it opens the level select screen.
+ * @param level   - The current level number (0-based)
+ * @param onPress - Callback fired when the button is pressed
+ */
+const LevelMenuButton = ({ level }: LevelMenuBtnProps) => {
+   const levelText = level === 0 ? "Tutorial" : "Level " + (level + 1);
+
+   return (
+      <TouchableOpacity
+         style={styles.levelMenuBtn}
+         accessibilityLabel={`${levelText}, tap to select a level`}
+      >
+         <Text style={styles.levelMenuIcon}>⊞</Text>
+         <Text style={styles.levelMenuText}>{levelText}</Text>
+      </TouchableOpacity>
    );
 }
 
@@ -71,26 +144,49 @@ const App = (props: Props) => {
  * @param onNextLevel - Callback fired when the next level button is pressed
  */
 const MessageBar = ({ message, showButton, onNextLevel }: MessageBarProps) => (
-  <View style={styles.messageBar}>
+   <>
       <Text style={styles.message}>{message}</Text>
       {showButton && (
-         <TouchableOpacity style={styles.button} onPress={onNextLevel}>
-            <Text style={styles.buttonText}>Next Level →</Text>
+         <TouchableOpacity style={styles.nextLevelBtn} onPress={onNextLevel}>
+            <Text style={styles.nextLevelText}>Next Level →</Text>
          </TouchableOpacity>
       )}
-  </View>
+   </>
 );
 
 const styles = StyleSheet.create({
-   messageBar: {
+   root: {
+      flex: 1,
+   },
+   levelMenuBtn: {
+      flexDirection:     'row',
       alignItems:        'center',
-      paddingVertical:   4,
+      alignSelf:         'flex-start',
+      gap:               8,
+      backgroundColor:   '#f0f0f0',
+      borderWidth:       1,
+      borderColor:       '#ddd',
+      borderRadius:      8,
+      paddingVertical:   8,
+      paddingHorizontal: 14,
+   },
+   levelMenuIcon: {
+      fontSize: 16,
+      color:    '#333',
+   },
+   levelMenuText: {
+      fontSize:   14,
+      fontWeight: '500',
+      color:      '#333',
    },
    message: {
-      fontSize:    15,
-      color:       '#333',
+      fontSize:          15,
+      color:             '#333',
+      paddingVertical:   16,
+      textAlign:         'center',
+      width:             '100%',
    },
-   button: {
+   nextLevelBtn: {
       backgroundColor:   '#4cd964',
       paddingVertical:   8,
       paddingHorizontal: 24,
@@ -98,7 +194,7 @@ const styles = StyleSheet.create({
       marginRight:       0,
       borderRadius:      8,
    },
-   buttonText: {
+   nextLevelText: {
       fontSize:   15,
       fontWeight: '700',
       color:      '#fff',
