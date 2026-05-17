@@ -234,6 +234,7 @@ const PuzzleBoard = (props: Props) => {
          ))}
 
          <Animated.View
+            testID="ghost-tile"
             style={[
                styles.ghost,
                { width: board.tileWidth, height: board.tileHeight },
@@ -310,6 +311,7 @@ const PuzzleTile = (props: TileProps) => {
    return (
       <GestureDetector key={boardIndex} gesture={gesture}>
          <Animated.View
+            testID={`tile-${boardIndex}`}
             style={[
                styles.tile,
                {
