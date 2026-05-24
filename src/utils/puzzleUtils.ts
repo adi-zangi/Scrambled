@@ -3,7 +3,7 @@
  */
 
 import { useWindowDimensions } from "react-native";
-import { PuzzleImage } from "./imageUtils";
+import { Puzzle } from '../types/puzzle';
 
 /**
  * Dimensions of an N x N puzzle board and its tiles in pixels.
@@ -18,26 +18,15 @@ export interface Board {
 }
 
 /**
- * Returns the grid size (N) for a given level number.
- * @param level - The level number (0-based)
- * @returns The number of columns and rows in the grid
- */
-const getGridSize = (level: number): number => {
-  if (level === 0) return 3;  // 3X3 — tutorial
-  return 4;
-};
-
-/**
- * Calculates the board and tile pixel dimensions to fit a given image
+ * Calculates the board and tile pixel dimensions to fit a given puzzle image
  * within the available screen space while preserving its aspect ratio.
- * @param image - A PuzzleImage object
- * @param N     - The number of columns (and rows) in the grid
+ * @param puzzle - A Puzzle object
  * @returns A Board object
  */
-const useBoard = (image: PuzzleImage, N: number): Board => {
+const useBoard = (puzzle: Puzzle): Board => {
    const board =
    {
-      N: N,
+      N: puzzle.grid_size,
       boardWidth: 0,
       boardHeight: 0,
       tileWidth: 0,
@@ -49,8 +38,8 @@ const useBoard = (image: PuzzleImage, N: number): Board => {
    const maxWidth  = width  * 0.95;
    const maxHeight = height * 0.95;
 
-   const imageWidth = image.width;
-   const imageHeight = image.height;
+   const imageWidth = puzzle.image_width;
+   const imageHeight = puzzle.image_height;
 
    // Fit the board inside available space, preserving image ratio
    if (maxWidth > maxHeight) {
@@ -62,12 +51,12 @@ const useBoard = (image: PuzzleImage, N: number): Board => {
    }
 
    // Tile size derived from board size and tile border as exact integers
-   board.tileWidth = Math.floor(board.boardWidth / N) + (board.tileBorderWidth * 2);
-   board.tileHeight = Math.floor(board.boardHeight / N) + (board.tileBorderWidth * 2);
+   board.tileWidth = Math.floor(board.boardWidth / board.N) + (board.tileBorderWidth * 2);
+   board.tileHeight = Math.floor(board.boardHeight / board.N) + (board.tileBorderWidth * 2);
 
    // Recalculate board size from tile to include the borders
-   board.boardWidth = board.tileWidth * N;
-   board.boardHeight = board.tileHeight * N;
+   board.boardWidth = board.tileWidth * board.N;
+   board.boardHeight = board.tileHeight * board.N;
 
    return board;
 }
@@ -188,5 +177,5 @@ const indexFromPos = (x: number, y: number, board: Board): number => {
    return row * board.N + col;
 }
 
-export { shuffle, tileX, tileY, useBoard, isAdj, indexFromPos, getGridSize };
+export { shuffle, tileX, tileY, useBoard, isAdj, indexFromPos };
 

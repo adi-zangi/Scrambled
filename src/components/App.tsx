@@ -2,62 +2,113 @@
  * Root component. Manages navigation, current level, and player progress.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import PuzzleBoard from './PuzzleBoard';
-import { getImage, PuzzleImage } from '@/utils/imageUtils';
 import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions, ViewStyle } from 'react-native';
-import { getGridSize, useBoard } from '@/utils/puzzleUtils';
+import PuzzleMenu from './PuzzleMenu';
+import { Puzzle } from '@/types/puzzle';
+import { getPuzzle } from '../../services/puzzleService';
+import { useBoard } from '@/utils/puzzleUtils';
 
 type Props = {}
 
 interface State {
    level: number;
-   image: PuzzleImage;
+   puzzle: Puzzle;
    message: string;
+   showMenu: boolean;
    showButton: boolean;
 }
 
 interface LevelMenuBtnProps {
    level: number;
+   onMenuOpen: () => void;
 }
 
 interface MessageBarProps {
-   message:        string;
-   showButton:     boolean;
-   onNextLevel:    () => void;
+   message: string;
+   showButton: boolean;
+   onNextLevel: () => void;
 }
+
+const EMPTY_PUZZLE: Puzzle = {
+  id: '',
+  level_number: 0,
+  image_url: '',
+  image_width: 0,
+  image_height: 0,
+  grid_size: 0,
+  solved: false,
+  progress: [],
+  completion_message: '',
+};
 
 const App = (props: Props) => {
    const [state, setState] = useState<State>({
       level: 0,
-      image: getImage(0),
-      message: "Drag or click two adjacent tiles to swap",
+      puzzle: EMPTY_PUZZLE,
+      message: "",
+      showMenu: false,
       showButton: false,
    });
 
-   const gridSize = getGridSize(state.level);
-   const board = useBoard(state.image, gridSize);
+   useEffect(() => {
+      const initializeApp = async () => {
+         const puzzle = await getPuzzle(1);
+         setState({
+            level: 1,
+            puzzle,
+            message: "Drag or click two adjacent tiles to swap",
+            showMenu: false,
+            showButton: false,
+         });
+      };
+
+      initializeApp();
+   }, []);
+
+   const board = useBoard(state.puzzle);
 
    const { width } = useWindowDimensions();
+
+   const onMenuOpen = () => {
+      setState({
+         ...state,
+         showMenu: !state.showMenu,
+      });
+   }
+
+   const onPuzzleSelected = async (level: number) => {
+      const puzzle = await getPuzzle(level);
+      setState({
+         ...state,
+         level,
+         puzzle,
+         message: level === 1 ? "Drag or click two adjacent tiles to swap" : "",
+         showMenu: false,
+      });
+  };
 
    const onPuzzleSolved = () => {
       setState({
          ...state,
-         message: "It's " + state.image.desc.toLowerCase() + "!",
+         message: state.puzzle?.completion_message.toLowerCase(),
          showButton: true,
       });
    }
 
-   const onNextLevel = () => {
+   const onNextLevel = async () => {
+      const nextLevel = state.level + 1;
+      const puzzle = await getPuzzle(nextLevel);
       setState({
          ...state,
-         level: state.level + 1,
-         image: getImage(state.level + 1),
+         level: nextLevel,
+         puzzle,
          message: "",
          showButton: false,
       });
-   }
+  };
 
    const containerStyle: ViewStyle = {
       flex:          1,
@@ -88,30 +139,44 @@ const App = (props: Props) => {
       flexShrink:     0,
    };
 
+   const puzzleMenuStyle: ViewStyle = {
+      width:  board.boardWidth + ((width - board.boardWidth) / 2),
+      height: '100%',
+   };
+
    return (
       <GestureHandlerRootView style={styles.root}>
          <View style={containerStyle}>
             <View style={topBarStyle}>
                <LevelMenuButton
                   level={state.level}
+                  onMenuOpen={onMenuOpen}
                />
             </View>
-            <View style={puzzleContainerStyle}>
-               <PuzzleBoard
-                  level={state.level}
-                  image={state.image}
-                  board={board}
-                  gridSize={gridSize}
-                  onPuzzleSolved={onPuzzleSolved}
-               />
-            </View>
-            <View style={messageBarStyle}>
-               <MessageBar
-                  message={state.message}
-                  showButton={state.showButton}
-                  onNextLevel={onNextLevel}
-               />
-            </View>
+           {state.showMenu ? (
+               <View style={puzzleMenuStyle}>
+                  <PuzzleMenu
+                     onPuzzleSelected={onPuzzleSelected}
+                  />
+               </View>
+            ) : (
+               <>
+                  <View style={puzzleContainerStyle}>
+                     <PuzzleBoard
+                        puzzle={state.puzzle}
+                        board={board}
+                        onPuzzleSolved={onPuzzleSolved}
+                     />
+                  </View>
+                  <View style={messageBarStyle}>
+                     <MessageBar
+                        message={state.message}
+                        showButton={state.showButton}
+                        onNextLevel={onNextLevel}
+                     />
+                  </View>
+               </>
+            )}
          </View>
       </GestureHandlerRootView>
    );
@@ -123,12 +188,13 @@ const App = (props: Props) => {
  * @param level   - The current level number (0-based)
  * @param onPress - Callback fired when the button is pressed
  */
-const LevelMenuButton = ({ level }: LevelMenuBtnProps) => {
-   const levelText = level === 0 ? "Tutorial" : "Level " + (level + 1);
+const LevelMenuButton = ({ level, onMenuOpen }: LevelMenuBtnProps) => {
+   const levelText = level === 0 ? "Tutorial" : "Level " + level;
 
    return (
       <TouchableOpacity
          style={styles.levelMenuBtn}
+         onPress={onMenuOpen}
          accessibilityLabel={`${levelText}, tap to select a level`}
       >
          <Text style={styles.levelMenuIcon}>⊞</Text>

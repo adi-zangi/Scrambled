@@ -7,15 +7,13 @@ import React, { useEffect, useState } from 'react';
 import { Board, indexFromPos, isAdj, shuffle, tileX, tileY } from '@/utils/puzzleUtils';
 import Animated, { SharedValue, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { ComposedGesture, Gesture, GestureDetector, GestureType, PanGesture } from 'react-native-gesture-handler';
-import { PuzzleImage } from '@/utils/imageUtils';
+import { Puzzle } from '../types/puzzle';
 import { runOnJS } from 'react-native-worklets';
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 interface Props {
-   level: number;
-   image: PuzzleImage;
+   puzzle: Puzzle;
    board: Board;
-   gridSize: number;
    onPuzzleSolved: () => void;
 }
 
@@ -47,8 +45,8 @@ interface TileProps {
 }
 
 const PuzzleBoard = (props: Props) => {
-   const { level, image, board } = props;
-   const N = props.gridSize;
+   const { puzzle, board } = props;
+   const N = props.puzzle.grid_size;
 
    const [state, setState] = useState<State>({
       boardArray: [],
@@ -80,7 +78,7 @@ const PuzzleBoard = (props: Props) => {
          selected:   null,
          solved:     false,
       });
-   }, [level]);
+   }, [puzzle.level_number]);
 
    /**
     * Swaps two tiles on the board.
@@ -224,11 +222,11 @@ const PuzzleBoard = (props: Props) => {
                boardIndex={boardIndex}
                tileVal={tileVal}
                board={board}
-               imageUri={image.uri}
+               imageUri={puzzle.image_url}
                gesture={createTileGesture(boardIndex)}
                dragState={dragState}
                state={state}
-               isTutorial={level === 0}
+               isTutorial={puzzle.level_number === 1}
                N={N}
             />
          ))}
@@ -243,7 +241,7 @@ const PuzzleBoard = (props: Props) => {
             pointerEvents="none"
          >
             <AnimatedImage
-               source={{ uri: image.uri }}
+               source={{ uri: puzzle.image_url }}
                style={useAnimatedStyle(() => ({
                   width:    board.boardWidth,
                   height:   board.boardHeight,
