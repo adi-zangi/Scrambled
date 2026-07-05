@@ -6,19 +6,23 @@ import React, { useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import PuzzleBoard from './PuzzleBoard';
 import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions, ViewStyle } from 'react-native';
-import PuzzleMenu from './PuzzleMenu';
+import LevelMenu from './LevelMenu';
 import { Puzzle } from '@/types/puzzle';
-import { getPuzzle } from '../../services/puzzleService';
+import { getPuzzle, getPuzzleSolved } from '../../services/puzzleService';
 import { useBoard } from '@/utils/puzzleUtils';
+import { getDeviceId } from '../../services/deviceService';
+import { getResumeLevel, setResumeLevel } from '../../services/resumeLevelService';
 
 type Props = {}
 
 interface State {
    level: number;
    puzzle: Puzzle;
-   message: string;
+   deviceId: string;
    showMenu: boolean;
    showButton: boolean;
+   loading: boolean;
+   solved: boolean;
 }
 
 interface LevelMenuBtnProps {
@@ -27,46 +31,80 @@ interface LevelMenuBtnProps {
 }
 
 interface MessageBarProps {
-   message: string;
+   puzzle: Puzzle;
+   solved: boolean;
    showButton: boolean;
    onNextLevel: () => void;
 }
 
 const EMPTY_PUZZLE: Puzzle = {
-  id: '',
-  level_number: 0,
-  image_url: '',
-  image_width: 0,
-  image_height: 0,
-  grid_size: 0,
-  solved: false,
-  progress: [],
-  completion_message: '',
+   id: '',
+   level_number: 0,
+   image_url: '',
+   image_width: 0,
+   image_height: 0,
+   grid_size: 0,
+   completion_message: '',
 };
 
 const App = (props: Props) => {
    const [state, setState] = useState<State>({
       level: 0,
       puzzle: EMPTY_PUZZLE,
-      message: "",
+      deviceId: '',
       showMenu: false,
       showButton: false,
+      loading: true,
+      solved: false,
    });
 
+   // Runs once on mount: loads this device's ID and its last opened
+   // level in parallel, then fetches that level, falling back to level 1
+   // if none was recorded yet.
    useEffect(() => {
       const initializeApp = async () => {
-         const puzzle = await getPuzzle(1);
+         const [deviceId, resumeLevel] = await Promise.all([
+            getDeviceId(),
+            getResumeLevel(),
+         ]);
+         const level = resumeLevel ?? 1;
+         const puzzle = await getPuzzle(level);
          setState({
-            level: 1,
+            level,
             puzzle,
-            message: "Drag or click two adjacent tiles to swap",
+            deviceId,
             showMenu: false,
             showButton: false,
+            loading: false,
+            solved: false,
          });
       };
 
       initializeApp();
    }, []);
+
+   // Fetches this device's solved status for the current puzzle whenever
+   // it changes.
+   useEffect(() => {
+      if (!state.deviceId || !state.puzzle.id) {
+         return;
+      }
+
+      let cancelled = false;
+
+      const loadSolvedStatus = async () => {
+         const solved = await getPuzzleSolved(state.deviceId, state.puzzle.id);
+         if (!cancelled) {
+            setState((prev) => ({ ...prev, solved }));
+         }
+      };
+
+      loadSolvedStatus();
+
+      return () => {
+         cancelled = true;
+      };
+   }, [state.puzzle.id, state.deviceId]);
 
    const board = useBoard(state.puzzle);
 
@@ -81,11 +119,13 @@ const App = (props: Props) => {
 
    const onPuzzleSelected = async (level: number) => {
       const puzzle = await getPuzzle(level);
+      setResumeLevel(level).catch((error) => {
+         console.error('Failed to save level:', error);
+      });
       setState({
          ...state,
          level,
          puzzle,
-         message: level === 1 ? "Drag or click two adjacent tiles to swap" : "",
          showMenu: false,
       });
   };
@@ -93,20 +133,23 @@ const App = (props: Props) => {
    const onPuzzleSolved = () => {
       setState({
          ...state,
-         message: state.puzzle?.completion_message.toLowerCase(),
          showButton: true,
+         solved: true,
       });
    }
 
    const onNextLevel = async () => {
       const nextLevel = state.level + 1;
       const puzzle = await getPuzzle(nextLevel);
+      setResumeLevel(nextLevel).catch((error) => {
+         console.error('Failed to save level:', error);
+      });
       setState({
          ...state,
          level: nextLevel,
          puzzle,
-         message: "",
          showButton: false,
+         solved: false,
       });
   };
 
@@ -144,6 +187,14 @@ const App = (props: Props) => {
       height: '100%',
    };
 
+   if (state.loading) {
+      return (
+         <GestureHandlerRootView style={styles.root}>
+            <View style={containerStyle} />
+         </GestureHandlerRootView>
+      );
+   }
+
    return (
       <GestureHandlerRootView style={styles.root}>
          <View style={containerStyle}>
@@ -155,7 +206,8 @@ const App = (props: Props) => {
             </View>
            {state.showMenu ? (
                <View style={puzzleMenuStyle}>
-                  <PuzzleMenu
+                  <LevelMenu
+                     deviceId={state.deviceId}
                      onPuzzleSelected={onPuzzleSelected}
                   />
                </View>
@@ -165,12 +217,14 @@ const App = (props: Props) => {
                      <PuzzleBoard
                         puzzle={state.puzzle}
                         board={board}
+                        deviceId={state.deviceId}
                         onPuzzleSolved={onPuzzleSolved}
                      />
                   </View>
                   <View style={messageBarStyle}>
                      <MessageBar
-                        message={state.message}
+                        puzzle={state.puzzle}
+                        solved={state.solved}
                         showButton={state.showButton}
                         onNextLevel={onNextLevel}
                      />
@@ -189,7 +243,7 @@ const App = (props: Props) => {
  * @param onPress - Callback fired when the button is pressed
  */
 const LevelMenuButton = ({ level, onMenuOpen }: LevelMenuBtnProps) => {
-   const levelText = level === 0 ? "Tutorial" : "Level " + level;
+   const levelText = "Level " + level;
 
    return (
       <TouchableOpacity
@@ -204,21 +258,36 @@ const LevelMenuButton = ({ level, onMenuOpen }: LevelMenuBtnProps) => {
 }
 
 /**
- * Renders a message bar with a text message and an optional next level button.
- * @param message     - The message text to display
+ * Renders a message bar that shows hints while a puzzle is in progress.
+ * Once a puzzle is completed, shows a congratulatory note and a button to
+ * advance to the next level.
+ * @param puzzle      - The current puzzle
+ * @param solved      - Whether the current puzzle has been solved
  * @param showButton  - Whether to show the next level button
  * @param onNextLevel - Callback fired when the next level button is pressed
  */
-const MessageBar = ({ message, showButton, onNextLevel }: MessageBarProps) => (
-   <>
-      <Text style={styles.message}>{message}</Text>
-      {showButton && (
-         <TouchableOpacity style={styles.nextLevelBtn} onPress={onNextLevel}>
-            <Text style={styles.nextLevelText}>Next Level →</Text>
-         </TouchableOpacity>
-      )}
-   </>
-);
+const MessageBar = ({ puzzle, solved, showButton, onNextLevel }: MessageBarProps) => {
+   let displayMessage;
+
+   if (solved) {
+      displayMessage = puzzle.completion_message;
+   } else if (puzzle.level_number === 1) {
+      displayMessage = "Drag or click two adjacent tiles to swap";
+   } else {
+      displayMessage = "";
+   }
+
+   return (
+      <>
+         <Text style={styles.message}>{displayMessage}</Text>
+         {showButton && (
+            <TouchableOpacity style={styles.nextLevelBtn} onPress={onNextLevel}>
+               <Text style={styles.nextLevelText}>Next Level →</Text>
+            </TouchableOpacity>
+         )}
+      </>
+   );
+};
 
 const styles = StyleSheet.create({
    root: {

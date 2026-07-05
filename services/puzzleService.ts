@@ -3,15 +3,32 @@
  *
  * Data access functions for the puzzles table in Supabase.
  * All database queries for puzzle data should go through this service.
+ *
+ * Environment variables:
+ *   Supabase credentials are read from app.config.ts, which in turn reads
+ *   them from a .env file in the project root (make sure .env is listed in
+ *   .gitignore):
+ *
+ *   SUPABASE_URL=your_supabase_url
+ *   SUPABASE_ANON_KEY=your_anon_key
+ *
+ *   Both values are in the Supabase dashboard:
+ *     SUPABASE_URL      — Project Overview page
+ *     SUPABASE_ANON_KEY — Project Settings > API Keys (the "anon" / "public" key)
+ * 
+ *   This must be the anon key, not the service role key. The service role key
+ *   belongs only in scripts/import_csv.ts, which reads it from this same .env
+ *   file under
+ *   SUPABASE_SERVICE_ROLE_KEY.
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { Puzzle } from '../src/types/puzzle';
+import { Puzzle, PuzzleProgress } from '../src/types/puzzle';
 import Constants from 'expo-constants';
 
 const supabase = createClient(
    Constants.expoConfig?.extra?.supabaseUrl,
-   Constants.expoConfig?.extra?.supabaseServiceRoleKey
+   Constants.expoConfig?.extra?.supabaseAnonKey
 );
 
 /**
@@ -32,35 +49,123 @@ const getPuzzle = async (level: number): Promise<Puzzle> => {
 };
 
 /**
- * Returns the total number of puzzles for a given grid size.
+ * Fetches all puzzles, ordered by level number.
  */
-const getNumberOfPuzzles = async (gridSize: number): Promise<number> => {
-   const { count, error } = await supabase
+const getAllPuzzles = async (): Promise<Puzzle[]> => {
+   const { data, error } = await supabase
       .from('puzzles')
-      .select('*', { count: 'exact', head: true })
-      .eq('grid_size', gridSize);
+      .select('*')
+      .order('level_number', { ascending: true });
 
    if (error) {
-      throw new Error(`Failed to fetch puzzle count for grid size ${gridSize}: ${error.message}`);
+      throw new Error(`Failed to fetch all puzzles: ${error.message}`);
    }
 
-   return count ?? 0;
+   return data;
 };
 
 /**
- * Returns a sorted list of all grid sizes that have at least one puzzle.
+ * Fetches a device's saved solved/progress state for a puzzle.
+ * Returns null if this device has never reported progress on it, in
+ * which case the caller should treat the puzzle as unsolved and unstarted.
  */
-const getGridSizes = async (): Promise<number[]> => {
+const getPuzzleProgress = async (
+   deviceId: string,
+   puzzleId: string
+): Promise<PuzzleProgress | null> => {
    const { data, error } = await supabase
-      .from('puzzles')
-      .select('grid_size');
+      .from('puzzle_progress')
+      .select('*')
+      .eq('device_id', deviceId)
+      .eq('puzzle_id', puzzleId)
+      .maybeSingle();
 
    if (error) {
-      throw new Error(`Failed to fetch grid sizes: ${error.message}`);
+      throw new Error(`Failed to fetch puzzle progress for puzzle ${puzzleId}: ${error.message}`);
    }
 
-   const unique = [...new Set(data.map((row) => row.grid_size))];
-   return unique.sort((a, b) => a - b);
+   return data;
 };
 
-export { getPuzzle, getNumberOfPuzzles, getGridSizes };
+/**
+ * Fetches every progress row a device has, across all puzzles.
+ */
+const getAllPuzzleProgressForDevice = async (deviceId: string): Promise<PuzzleProgress[]> => {
+   const { data, error } = await supabase
+      .from('puzzle_progress')
+      .select('*')
+      .eq('device_id', deviceId);
+
+   if (error) {
+      throw new Error(`Failed to fetch puzzle progress for device: ${error.message}`);
+   }
+
+   return data;
+};
+
+/**
+ * Fetches whether a device has already solved a puzzle.
+ */
+const getPuzzleSolved = async (deviceId: string, puzzleId: string): Promise<boolean> => {
+   const { data, error } = await supabase
+      .from('puzzle_progress')
+      .select('solved')
+      .eq('device_id', deviceId)
+      .eq('puzzle_id', puzzleId)
+      .maybeSingle();
+
+   if (error) {
+      throw new Error(`Failed to fetch solved status for puzzle ${puzzleId}: ${error.message}`);
+   }
+
+   return data?.solved ?? false;
+};
+
+/**
+ * Marks a puzzle as solved for a device. Creates the progress row if it
+ * doesn't exist yet. Does not affect the stored progress array.
+ */
+const markPuzzleSolved = async (deviceId: string, puzzleId: string): Promise<void> => {
+   const { error } = await supabase
+      .from('puzzle_progress')
+      .upsert(
+         { device_id: deviceId, puzzle_id: puzzleId, solved: true },
+         { onConflict: 'device_id,puzzle_id' }
+      );
+
+   if (error) {
+      throw new Error(`Failed to mark puzzle ${puzzleId} as solved: ${error.message}`);
+   }
+};
+
+/**
+ * Saves a device's current tile arrangement for a puzzle. Creates the
+ * progress row if it doesn't exist yet. Does not affect the stored
+ * solved flag.
+ */
+const savePuzzleProgress = async (
+   deviceId: string,
+   puzzleId: string,
+   progress: number[]
+): Promise<void> => {
+   const { error } = await supabase
+      .from('puzzle_progress')
+      .upsert(
+         { device_id: deviceId, puzzle_id: puzzleId, progress },
+         { onConflict: 'device_id,puzzle_id' }
+      );
+
+   if (error) {
+      throw new Error(`Failed to save puzzle progress for puzzle ${puzzleId}: ${error.message}`);
+   }
+};
+
+export {
+   getPuzzle,
+   getAllPuzzles,
+   getPuzzleProgress,
+   getAllPuzzleProgressForDevice,
+   getPuzzleSolved,
+   markPuzzleSolved,
+   savePuzzleProgress,
+};

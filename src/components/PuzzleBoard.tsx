@@ -3,17 +3,19 @@
  */
 
 import { Image, StyleSheet, View } from 'react-native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Board, indexFromPos, isAdj, shuffle, tileX, tileY } from '@/utils/puzzleUtils';
 import Animated, { SharedValue, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { ComposedGesture, Gesture, GestureDetector, GestureType, PanGesture } from 'react-native-gesture-handler';
 import { Puzzle } from '../types/puzzle';
 import { runOnJS } from 'react-native-worklets';
+import { getPuzzleProgress, markPuzzleSolved, savePuzzleProgress } from '../../services/puzzleService';
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 interface Props {
    puzzle: Puzzle;
    board: Board;
+   deviceId: string;
    onPuzzleSolved: () => void;
 }
 
@@ -21,6 +23,7 @@ interface State {
    boardArray: number[];
    selected: number | null;
    solved: boolean;
+   loading: boolean;
 }
 
 interface DragState {
@@ -45,13 +48,14 @@ interface TileProps {
 }
 
 const PuzzleBoard = (props: Props) => {
-   const { puzzle, board } = props;
+   const { puzzle, board, deviceId } = props;
    const N = props.puzzle.grid_size;
 
    const [state, setState] = useState<State>({
       boardArray: [],
       selected: null,
       solved: false,
+      loading: true,
    });
 
    // Shared values for the dragged tile's animation
@@ -71,13 +75,56 @@ const PuzzleBoard = (props: Props) => {
       isDragging,
    };
 
-   // Handles initial board setup and level changes
+   // A copy of state.boardArray so the unmount cleanup below can read the
+   // latest arrangement without depending on it and re-running on every
+   // move.
+   const boardArrayRef = useRef<number[]>([]);
    useEffect(() => {
-      setState({
-         boardArray: shuffle(Array.from({ length: N * N }, (_, i) => i), N),
-         selected:   null,
-         solved:     false,
-      });
+      boardArrayRef.current = state.boardArray;
+   }, [state.boardArray]);
+
+   // Loads this device's saved progress when the puzzle opens (or shuffles
+   // a new scrambled board if there's none saved yet), and saves the
+   // current arrangement when it closes.
+   useEffect(() => {
+      let cancelled = false;
+
+      const load = async () => {
+         const saved = await getPuzzleProgress(deviceId, puzzle.id);
+         if (cancelled) {
+            return;
+         }
+
+         let boardArray: number[];
+         let solved = false;
+
+         if (saved?.solved) {
+            solved = true;
+            boardArray = Array.from({ length: N * N }, (_, i) => i);
+         } else if (saved !== null && saved.progress.length === N * N) {
+            boardArray = saved.progress;
+         } else {
+            boardArray = shuffle(Array.from({ length: N * N }, (_, i) => i), N);
+         }
+
+         setState({
+            boardArray,
+            selected: null,
+            solved,
+            loading: false,
+         });
+      };
+
+      load();
+
+      return () => {
+         cancelled = true;
+         if (boardArrayRef.current.length > 0) {
+            savePuzzleProgress(deviceId, puzzle.id, boardArrayRef.current).catch((error) => {
+               console.error('Failed to save puzzle progress on close:', error);
+            });
+         }
+      };
    }, [puzzle.level_number]);
 
    /**
@@ -94,6 +141,9 @@ const PuzzleBoard = (props: Props) => {
       [newBoard[fromIndex], newBoard[toIndex]] = [newBoard[toIndex], newBoard[fromIndex]];
       if (newBoard.every((v, i) => v === i)) {
          solved = true;
+         markPuzzleSolved(deviceId, puzzle.id).catch((error) => {
+            console.error('Failed to save solved status:', error);
+         });
          props.onPuzzleSolved();
       }
       setState({
@@ -206,6 +256,26 @@ const PuzzleBoard = (props: Props) => {
       opacity:   isDragging.value ? 0.85 : 0,
    }));
 
+   // Animates which portion of the source image the ghost tile shows.
+   const ghostImageAnimatedStyle = useAnimatedStyle(() => ({
+      width:    board.boardWidth,
+      height:   board.boardHeight,
+      position: 'absolute',
+      left:     dragTileVal.value >= 0 ? -tileX(dragTileVal.value, board) : 0,
+      top:      dragTileVal.value >= 0 ? -tileY(dragTileVal.value, board) : 0,
+   }));
+
+   if (state.loading) {
+      return (
+         <View
+            style={[
+               styles.board,
+               { width: board.boardWidth, height: board.boardHeight }
+            ]}
+         />
+      );
+   }
+
    return (
       <View
          style={[
@@ -242,13 +312,7 @@ const PuzzleBoard = (props: Props) => {
          >
             <AnimatedImage
                source={{ uri: puzzle.image_url }}
-               style={useAnimatedStyle(() => ({
-                  width:    board.boardWidth,
-                  height:   board.boardHeight,
-                  position: 'absolute',
-                  left:     dragTileVal.value >= 0 ? -tileX(dragTileVal.value, board) : 0,
-                  top:      dragTileVal.value >= 0 ? -tileY(dragTileVal.value, board) : 0,
-               }))}
+               style={ghostImageAnimatedStyle}
             />
          </Animated.View>
       </View>
