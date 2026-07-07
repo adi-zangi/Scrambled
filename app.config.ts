@@ -39,6 +39,7 @@ const config: ExpoConfig = {
          },
       ],
       'expo-web-browser',
+      'expo-image',
    ],
    experiments: {
       typedRoutes: true,
