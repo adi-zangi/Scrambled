@@ -2,11 +2,11 @@
  * Tests for puzzleUtils — grid position, adjacency, index conversion, and shuffle.
  */
 
-import { tileX, tileY, isAdj, indexFromPos, shuffle } from '@/utils/puzzleUtils';
-import { Board } from '@/utils/puzzleUtils';
+import { tileX, tileY, indexFromPos, shuffle } from '@/src/utils/puzzleUtils';
+import { Board } from '@/src/utils/puzzleUtils';
 
 const board: Board = {
-   N:               3,
+   gridSize:        3,
    boardWidth:      300,
    boardHeight:     300,
    tileWidth:       100,
@@ -63,59 +63,6 @@ describe('tileY', () => {
 
 });
 
-describe('isAdj', () => {
-
-   it('returns true for horizontal neighbours', () => {
-      expect(isAdj(0, 1, 3)).toBe(true);
-      expect(isAdj(1, 2, 3)).toBe(true);
-      expect(isAdj(3, 4, 3)).toBe(true);
-      expect(isAdj(4, 5, 3)).toBe(true);
-      expect(isAdj(6, 7, 3)).toBe(true);
-      expect(isAdj(7, 8, 3)).toBe(true);
-   });
-
-   it('returns true for vertical neighbours', () => {
-      expect(isAdj(0, 3, 3)).toBe(true);
-      expect(isAdj(3, 6, 3)).toBe(true);
-      expect(isAdj(1, 4, 3)).toBe(true);
-      expect(isAdj(4, 7, 3)).toBe(true);
-      expect(isAdj(2, 5, 3)).toBe(true);
-      expect(isAdj(5, 8, 3)).toBe(true);
-   });
-
-   it('returns true regardless of argument order', () => {
-      expect(isAdj(1, 0, 3)).toBe(true);
-      expect(isAdj(4, 3, 3)).toBe(true);
-      expect(isAdj(3, 0, 3)).toBe(true);
-      expect(isAdj(7, 4, 3)).toBe(true);
-   });
-
-   it('returns false for diagonal neighbours', () => {
-      expect(isAdj(0, 4, 3)).toBe(false);
-      expect(isAdj(2, 4, 3)).toBe(false);
-      expect(isAdj(6, 4, 3)).toBe(false);
-      expect(isAdj(8, 4, 3)).toBe(false);
-   });
-
-   it('returns false for tiles two steps apart', () => {
-      expect(isAdj(0, 2, 3)).toBe(false);
-      expect(isAdj(0, 6, 3)).toBe(false);
-      expect(isAdj(2, 8, 3)).toBe(false);
-      expect(isAdj(0, 8, 3)).toBe(false);
-   });
-
-   it('does not treat row-wrapping tiles as adjacent', () => {
-      // Tile 2 (row 0, col 2) and tile 3 (row 1, col 0) are not adjacent
-      expect(isAdj(2, 3, 3)).toBe(false);
-      expect(isAdj(5, 6, 3)).toBe(false);
-   });
-
-   it('returns false for a tile with itself', () => {
-      expect(isAdj(4, 4, 3)).toBe(false);
-   });
-
-});
-
 describe('indexFromPos', () => {
 
    it('returns the correct board index for pixel positions inside the board', () => {
@@ -137,7 +84,7 @@ describe('indexFromPos', () => {
    });
 
    it('is consistent with tileX and tileY', () => {
-      for (let i = 0; i < board.N * board.N; i++) {
+      for (let i = 0; i < board.gridSize * board.gridSize; i++) {
          const x = tileX(i, board) + board.tileWidth  / 2;
          const y = tileY(i, board) + board.tileHeight / 2;
          expect(indexFromPos(x, y, board)).toBe(i);

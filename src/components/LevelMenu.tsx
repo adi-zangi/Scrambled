@@ -1,6 +1,6 @@
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, Image } from 'react-native';
 import React, { useEffect, useState } from 'react';
-import { getAllPuzzles, getAllPuzzleProgressForDevice } from '../../services/puzzleService';
+import { getAllPuzzles, getAllPuzzleProgressForDevice } from '@/services/puzzleService';
 
 interface LevelMenuProps {
    deviceId: string;

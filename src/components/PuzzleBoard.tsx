@@ -4,12 +4,12 @@
 
 import { Image, StyleSheet, View } from 'react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { Board, indexFromPos, isAdj, shuffle, tileX, tileY } from '@/utils/puzzleUtils';
+import { Board, indexFromPos, shuffle, tileX, tileY } from '../utils/puzzleUtils';
 import Animated, { SharedValue, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { ComposedGesture, Gesture, GestureDetector, GestureType, PanGesture } from 'react-native-gesture-handler';
 import { Puzzle } from '../types/puzzle';
 import { runOnJS } from 'react-native-worklets';
-import { getPuzzleProgress, markPuzzleSolved, savePuzzleProgress } from '../../services/puzzleService';
+import { getPuzzleProgress, markPuzzleSolved, savePuzzleProgress } from '@/services/puzzleService';
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 interface Props {
@@ -30,21 +30,17 @@ interface DragState {
   isDragging:      SharedValue<boolean>;
   dragBoardIndex:  SharedValue<number>;
   dragTileVal:     SharedValue<number>;
-  dragTargetIndex: SharedValue<number>;
   dragX:           SharedValue<number>;
   dragY:           SharedValue<number>;
 }
 
 interface TileProps {
-  boardIndex: number;
-  tileVal:    number;
-  board:      Board;
-  imageUri:   string;
-  gesture:    ComposedGesture | GestureType;
-  dragState:  DragState;
-  state:      State;
-  isTutorial: boolean;
-  N:          number;
+  boardIndex:    number;
+  tileVal:       number;
+  board:         Board;
+  imageUri:      string;
+  gesture:       ComposedGesture | GestureType;
+  selectedIndex: number | null;
 }
 
 const PuzzleBoard = (props: Props) => {
@@ -63,7 +59,6 @@ const PuzzleBoard = (props: Props) => {
    const dragY            = useSharedValue(0);
    const dragBoardIndex   = useSharedValue(-1);
    const dragTileVal      = useSharedValue(-1);
-   const dragTargetIndex  = useSharedValue(-1);
    const isDragging       = useSharedValue(false);
 
    const dragState: DragState = {
@@ -71,7 +66,6 @@ const PuzzleBoard = (props: Props) => {
       dragY,
       dragBoardIndex,
       dragTileVal,
-      dragTargetIndex,
       isDragging,
    };
 
@@ -133,7 +127,7 @@ const PuzzleBoard = (props: Props) => {
     * @param toIndex   - Board index of the second tile to swap
     */
    const doSwap = (fromIndex: number, toIndex: number) => {
-      if (state.solved || !isAdj(fromIndex, toIndex, N)) {
+      if (state.solved || fromIndex === toIndex) {
          return;
       }
       const newBoard = [...state.boardArray];
@@ -156,8 +150,8 @@ const PuzzleBoard = (props: Props) => {
 
    /**
     * Handles a tile press during the puzzle game.
-    * Highlights the selected tile and swaps the last two selected tiles
-    * if they are adjacent.
+    * Selects a tile if none is selected, deselects it if pressed again,
+    * or swaps it with whichever tile is already selected.
     * @param boardIndex - The board index of the pressed tile (0 to N*N-1)
     */
    const handlePress = (boardIndex: number) => {
@@ -175,20 +169,15 @@ const PuzzleBoard = (props: Props) => {
             ...state,
             selected: null,
          });
-      } else if (isAdj(selected, boardIndex, N)) {
-         doSwap(selected, boardIndex);
       } else {
-         setState({
-            ...state,
-            selected: boardIndex,
-         });
+         doSwap(selected, boardIndex);
       }
    }
 
    /**
     * Creates a combined tap and drag gesture for a tile at the given board index.
-    * Tap selects or swaps the tile. Drag swaps the tile.
-    * Gestures are disabled when the puzzle is solved.
+    * Tap selects or swaps the tile. Drag swaps the tile with whichever tile
+    * it's dropped onto. Gestures are disabled when the puzzle is solved.
     * @param boardIndex - The board index of the tile being interacted with
     * @returns A combined exclusive gesture handler for tap and drag
     */
@@ -207,7 +196,7 @@ const PuzzleBoard = (props: Props) => {
 
    /**
     * Creates a pan gesture for a tile at the given board index.
-    * On drag end, swaps with the tile under the cursor if the tile is adjacent.
+    * On drag end, swaps with whichever tile is under the cursor.
     * The gesture is disabled when the puzzle is solved.
     * @param boardIndex - The board index of the tile being dragged
     * @returns A pan gesture handler to attach to a GestureDetector
@@ -225,15 +214,8 @@ const PuzzleBoard = (props: Props) => {
          })
          .onUpdate((e) => {
             'worklet';
-            dragX.value  = tileX(boardIndex, board) + e.translationX;
-            dragY.value  = tileY(boardIndex, board) + e.translationY;
-            const landX  = tileX(boardIndex, board) + e.translationX + board.tileWidth  / 2;
-            const landY  = tileY(boardIndex, board) + e.translationY + board.tileHeight / 2;
-            const target = indexFromPos(landX, landY, board);
-            dragTargetIndex.value =
-               target >= 0 && target !== boardIndex && isAdj(boardIndex, target, N)
-                  ? target
-                  : -1;
+            dragX.value = tileX(boardIndex, board) + e.translationX;
+            dragY.value = tileY(boardIndex, board) + e.translationY;
          })
          .onEnd((e) => {
             'worklet';
@@ -294,10 +276,7 @@ const PuzzleBoard = (props: Props) => {
                board={board}
                imageUri={puzzle.image_url}
                gesture={createTileGesture(boardIndex)}
-               dragState={dragState}
-               state={state}
-               isTutorial={puzzle.level_number === 1}
-               N={N}
+               selectedIndex={state.selected}
             />
          ))}
 
@@ -320,55 +299,14 @@ const PuzzleBoard = (props: Props) => {
 }
 
 /**
- * Renders a single puzzle tile with animated drag and selection styles.
+ * Renders a single puzzle tile. Shrinks slightly when selected to indicate
+ * the selection; otherwise renders at full size. Border stays a static
+ * transparent width throughout so the tile grid never shifts.
  */
 const PuzzleTile = (props: TileProps) => {
-   const {
-      boardIndex,
-      tileVal,
-      board,
-      imageUri,
-      gesture,
-      dragState,
-      state,
-      isTutorial,
-      N,
-   } = props;
+   const { boardIndex, tileVal, board, imageUri, gesture, selectedIndex } = props;
 
-   
-   /**
-    * Animates the tile's style based on its drag and selection state.
-    * In tutorial mode, dims the source tile and highlights the valid targets.
-    * When not in tutorial mode, adds a static transparent border with no animation.
-    */
-   const tileAnimatedStyle =
-      useAnimatedStyle(() => {
-         if (!isTutorial) {
-            return {
-               borderWidth: board.tileBorderWidth,
-               borderColor: 'transparent',
-            };
-         }
-
-         const dragging      = dragState.isDragging.value;
-         const isSource      = dragging && dragState.dragBoardIndex.value  === boardIndex;
-         const isValidTarget = dragging && dragState.dragTargetIndex.value === boardIndex;
-         const isSelected    = !dragging && boardIndex === state.selected;
-         const isAdjacent    = !dragging
-                              && state.selected !== null
-                              && isAdj(state.selected, boardIndex, N)
-                              && boardIndex !== state.selected;
-
-         return {
-            opacity:     isSource ? 0.4 : 1,
-            borderWidth: isValidTarget || isAdjacent || isSelected ? 3 : board.tileBorderWidth,
-            borderColor: isValidTarget || isAdjacent
-               ? '#4cd964'
-               : isSelected
-                  ? '#4a90ff'
-                  : 'transparent',
-         };
-   });
+   const isSelected = boardIndex === selectedIndex;
 
    return (
       <GestureDetector key={boardIndex} gesture={gesture}>
@@ -377,12 +315,14 @@ const PuzzleTile = (props: TileProps) => {
             style={[
                styles.tile,
                {
-                  width:  board.tileWidth,
-                  height: board.tileHeight,
-                  left:   tileX(boardIndex, board),
-                  top:    tileY(boardIndex, board),
+                  width:       board.tileWidth,
+                  height:      board.tileHeight,
+                  left:        tileX(boardIndex, board),
+                  top:         tileY(boardIndex, board),
+                  borderWidth: board.tileBorderWidth,
+                  borderColor: 'transparent',
                },
-               tileAnimatedStyle,
+               isSelected && styles.selectedTile,
             ]}
          >
             <Image
@@ -411,6 +351,9 @@ const styles = StyleSheet.create({
    tile: {
       position: 'absolute',
       overflow: 'hidden',
+   },
+   selectedTile: {
+      transform: [{ scale: 0.95 }],
    },
    ghost: {
       position:  'absolute',

@@ -7,11 +7,11 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import PuzzleBoard from './PuzzleBoard';
 import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions, ViewStyle } from 'react-native';
 import LevelMenu from './LevelMenu';
-import { Puzzle } from '@/types/puzzle';
-import { getPuzzle, getPuzzleSolved } from '../../services/puzzleService';
-import { useBoard } from '@/utils/puzzleUtils';
-import { getDeviceId } from '../../services/deviceService';
-import { getResumeLevel, setResumeLevel } from '../../services/resumeLevelService';
+import { Puzzle } from '../types/puzzle';
+import { getPuzzle, getPuzzleSolved } from '@/services/puzzleService';
+import { useBoard } from '../utils/puzzleUtils';
+import { getDeviceId } from '@/services/deviceService';
+import { getResumeLevel, setResumeLevel } from '@/services/resumeLevelService';
 
 type Props = {}
 
@@ -267,18 +267,21 @@ const LevelMenuButton = ({ level, onMenuOpen }: LevelMenuBtnProps) => {
  * @param onNextLevel - Callback fired when the next level button is pressed
  */
 const MessageBar = ({ puzzle, solved, showButton, onNextLevel }: MessageBarProps) => {
+   let displayTitle;
    let displayMessage;
 
    if (solved) {
       displayMessage = puzzle.completion_message;
    } else if (puzzle.level_number === 1) {
-      displayMessage = "Drag or click two adjacent tiles to swap";
+      displayTitle = "How to play";
+      displayMessage = "Drag a tile into another tile or click on two tiles to swap them";
    } else {
       displayMessage = "";
    }
 
    return (
       <>
+         <Text style={styles.messageTitle}>{displayTitle}</Text>
          <Text style={styles.message}>{displayMessage}</Text>
          {showButton && (
             <TouchableOpacity style={styles.nextLevelBtn} onPress={onNextLevel}>
@@ -317,6 +320,14 @@ const styles = StyleSheet.create({
    message: {
       fontSize:          15,
       color:             '#333',
+      paddingVertical:   16,
+      textAlign:         'center',
+      width:             '100%',
+   },
+   messageTitle: {
+      fontSize:          15,
+      color:             '#333',
+      fontWeight:        'bold',
       paddingVertical:   16,
       textAlign:         'center',
       width:             '100%',

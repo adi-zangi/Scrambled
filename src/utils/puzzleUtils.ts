@@ -9,7 +9,7 @@ import { Puzzle } from '../types/puzzle';
  * Dimensions of an N x N puzzle board and its tiles in pixels.
  */
 export interface Board {
-   N: number;
+   gridSize: number;
    boardWidth: number;
    boardHeight: number;
    tileWidth: number;
@@ -26,7 +26,7 @@ export interface Board {
 const useBoard = (puzzle: Puzzle): Board => {
    const board =
    {
-      N: puzzle.grid_size,
+      gridSize: puzzle.grid_size,
       boardWidth: 0,
       boardHeight: 0,
       tileWidth: 0,
@@ -51,12 +51,14 @@ const useBoard = (puzzle: Puzzle): Board => {
    }
 
    // Tile size derived from board size and tile border as exact integers
-   board.tileWidth = Math.floor(board.boardWidth / board.N) + (board.tileBorderWidth * 2);
-   board.tileHeight = Math.floor(board.boardHeight / board.N) + (board.tileBorderWidth * 2);
+   board.tileWidth = Math.floor(board.boardWidth / board.gridSize)
+      + (board.tileBorderWidth * 2);
+   board.tileHeight = Math.floor(board.boardHeight / board.gridSize)
+      + (board.tileBorderWidth * 2);
 
    // Recalculate board size from tile to include the borders
-   board.boardWidth = board.tileWidth * board.N;
-   board.boardHeight = board.tileHeight * board.N;
+   board.boardWidth = board.tileWidth * board.gridSize;
+   board.boardHeight = board.tileHeight * board.gridSize;
 
    return board;
 }
@@ -124,7 +126,7 @@ const getCol = (i: number, N: number): number => {
  */
 const tileX = (i: number, board: Board): number => {
    'worklet';
-   return getCol(i, board.N) * board.tileWidth;
+   return getCol(i, board.gridSize) * board.tileWidth;
 }
 
 /**
@@ -135,29 +137,7 @@ const tileX = (i: number, board: Board): number => {
  */
 const tileY = (i: number, board: Board): number => {
    'worklet';
-   return getRow(i, board.N) * board.tileHeight;
-}
-
-/**
- * Determines whether two board positions are adjacent to each other
- * horizontally or vertically. Prevents false adjacency across row
- * boundaries by checking that horizontal neighbours share the same row.
- * @param a - The first board index (0 to N*N-1)
- * @param b - The second board index (0 to N*N-1)
- * @param N - The number of columns (and rows) in the grid
- * @returns True if the two positions are directly next to each other
- */
-const isAdj = (a: any, b: any, N: number): boolean => {
-   'worklet';
-   const sameRow     = getRow(a, N) === getRow(b, N);
-   const sameCol     = getCol(a, N) === getCol(b, N);
-   const oneRowApart = Math.abs(getRow(a, N) - getRow(b, N)) === 1;
-   const oneColApart = Math.abs(getCol(a, N) - getCol(b, N)) === 1;
-
-   const horizontal = sameRow && oneColApart;
-   const vertical   = sameCol && oneRowApart;
-
-   return horizontal || vertical;
+   return getRow(i, board.gridSize) * board.tileHeight;
 }
 
 /**
@@ -171,11 +151,11 @@ const indexFromPos = (x: number, y: number, board: Board): number => {
    'worklet';
    const col = Math.floor(x / board.tileWidth);
    const row = Math.floor(y / board.tileHeight);
-   if (col < 0 || col >= board.N || row < 0 || row >= board.N) {
+   if (col < 0 || col >= board.gridSize || row < 0 || row >= board.gridSize) {
       return -1;
    }
-   return row * board.N + col;
+   return row * board.gridSize + col;
 }
 
-export { shuffle, tileX, tileY, useBoard, isAdj, indexFromPos };
+export { shuffle, tileX, tileY, useBoard, indexFromPos };
 
