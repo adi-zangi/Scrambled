@@ -1,5 +1,5 @@
 /**
- * Puzzle utility functions for grid position, adjacency, sizing, and shuffle logic.
+ * Puzzle utility functions for grid position, sizing, and shuffle logic.
  */
 
 import { useWindowDimensions } from "react-native";

@@ -1,5 +1,5 @@
 /**
- * Tests for puzzleUtils — grid position, adjacency, index conversion, and shuffle.
+ * Tests for puzzleUtils — grid position, index conversion, and shuffle.
  */
 
 import { tileX, tileY, indexFromPos, shuffle } from '@/src/utils/puzzleUtils';
