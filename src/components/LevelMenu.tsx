@@ -71,6 +71,7 @@ const LevelMenu = ({ deviceId, onPuzzleSelected }: LevelMenuProps) => {
                         key={level}
                         onPress={() => onPuzzleSelected(level)}
                         style={styles.imageWrapper}
+                        accessibilityLabel={`Level ${level}`}
                      >
                         <View style={{
                            width: imageSize,

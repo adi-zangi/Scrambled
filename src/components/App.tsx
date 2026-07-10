@@ -69,24 +69,20 @@ const App = (props: Props) => {
          ]);
          const level = resumeLevel ?? 1;
          const puzzle = await getPuzzle(level);
-         setState({
+         setState((prev) => ({
+            ...prev,
             level,
             puzzle,
             deviceId,
-            showMenu: false,
-            showButton: false,
-            loading: false,
-            solved: false,
-         });
+         }));
       };
 
       initializeApp();
    }, []);
 
-   // Fetches this device's solved status for the current puzzle whenever
-   // it changes.
+   // Fetches this device's solved status for the initial puzzle on mount.
    useEffect(() => {
-      if (!state.deviceId || !state.puzzle.id) {
+      if (!state.deviceId || !state.puzzle.id || !state.loading) {
          return;
       }
 
@@ -95,7 +91,11 @@ const App = (props: Props) => {
       const loadSolvedStatus = async () => {
          const solved = await getPuzzleSolved(state.deviceId, state.puzzle.id);
          if (!cancelled) {
-            setState((prev) => ({ ...prev, solved }));
+            setState((prev) => ({
+               ...prev,
+               loading: false,
+               solved,
+            }));
          }
       };
 
@@ -104,53 +104,57 @@ const App = (props: Props) => {
       return () => {
          cancelled = true;
       };
-   }, [state.puzzle.id, state.deviceId]);
+   }, [state.puzzle.id, state.deviceId, state.loading]);
 
    const board = useBoard(state.puzzle);
 
    const { width } = useWindowDimensions();
 
    const onMenuOpen = () => {
-      setState({
-         ...state,
-         showMenu: !state.showMenu,
-      });
+      setState((prev) => ({
+         ...prev,
+         showMenu: !prev.showMenu,
+      }));
    }
 
    const onPuzzleSelected = async (level: number) => {
       const puzzle = await getPuzzle(level);
+      const solved = await getPuzzleSolved(state.deviceId, puzzle.id);
       setResumeLevel(level).catch((error) => {
          console.error('Failed to save level:', error);
       });
-      setState({
-         ...state,
+      setState((prev) => ({
+         ...prev,
          level,
          puzzle,
          showMenu: false,
-      });
+         showButton: false,
+         solved,
+      }));
   };
 
    const onPuzzleSolved = () => {
-      setState({
-         ...state,
+      setState((prev) => ({
+         ...prev,
          showButton: true,
          solved: true,
-      });
+      }));
    }
 
    const onNextLevel = async () => {
       const nextLevel = state.level + 1;
       const puzzle = await getPuzzle(nextLevel);
+      const solved = await getPuzzleSolved(state.deviceId, puzzle.id);
       setResumeLevel(nextLevel).catch((error) => {
          console.error('Failed to save level:', error);
       });
-      setState({
-         ...state,
+      setState((prev) => ({
+         ...prev,
          level: nextLevel,
          puzzle,
          showButton: false,
-         solved: false,
-      });
+         solved,
+      }));
   };
 
    const containerStyle: ViewStyle = {
