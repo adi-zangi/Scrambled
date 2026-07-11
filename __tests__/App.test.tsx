@@ -10,6 +10,7 @@ import {
    getPuzzleSolved,
    getAllPuzzles,
    getAllPuzzleProgressForDevice,
+   getAllPuzzlesSolvedForDevice,
 } from '@/services/puzzleService';
 import { getDeviceId } from '@/services/deviceService';
 import { getResumeLevel } from '@/services/resumeLevelService';
@@ -96,6 +97,7 @@ jest.mock('@/services/puzzleService', () => ({
    getPuzzleProgress: jest.fn(() => Promise.resolve(null)),
    markPuzzleSolved: jest.fn(() => Promise.resolve()),
    savePuzzleProgress: jest.fn(() => Promise.resolve()),
+   getAllPuzzlesSolvedForDevice: jest.fn(),
 }));
 
 jest.mock('@/services/deviceService', () => ({
@@ -111,6 +113,7 @@ const mockGetPuzzle = getPuzzle as jest.Mock;
 const mockGetPuzzleSolved = getPuzzleSolved as jest.Mock;
 const mockGetAllPuzzles = getAllPuzzles as jest.Mock;
 const mockGetAllProgress = getAllPuzzleProgressForDevice as jest.Mock;
+const mockGetAllSolved   = getAllPuzzlesSolvedForDevice as jest.Mock;
 const mockGetDeviceId = getDeviceId as jest.Mock;
 const mockGetResumeLevel = getResumeLevel as jest.Mock;
 
@@ -156,6 +159,7 @@ async function openMenuAndSelectLevel(level: number, findByText: any, findByLabe
 describe('App', () => {
    beforeEach(() => {
       jest.clearAllMocks();
+      mockGetAllSolved.mockResolvedValue([]);
       mockGetDeviceId.mockResolvedValue('device-1');
       mockGetResumeLevel.mockResolvedValue(null);
       mockGetAllPuzzles.mockResolvedValue([LEVEL_1_PUZZLE, LEVEL_2_PUZZLE]);

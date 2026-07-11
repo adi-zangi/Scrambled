@@ -2,7 +2,7 @@
  * Interactive puzzle board. Handles tile swapping, win detection, and move tracking.
  */
 
-import { Image, StyleSheet, View } from 'react-native';
+import { PixelRatio, StyleSheet, View } from 'react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { Board, indexFromPos, shuffle, tileX, tileY } from '../utils/puzzleUtils';
 import Animated, { SharedValue, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
@@ -10,6 +10,8 @@ import { ComposedGesture, Gesture, GestureDetector, GestureType, PanGesture } fr
 import { Puzzle } from '../types/puzzle';
 import { runOnJS } from 'react-native-worklets';
 import { getPuzzleProgress, markPuzzleSolved, savePuzzleProgress } from '@/services/puzzleService';
+import { Image } from 'expo-image';
+import { buildBoardImageUrl } from '../constants/thumbnails';
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 interface Props {
@@ -47,6 +49,16 @@ const PuzzleBoard = (props: Props) => {
    const { puzzle, board, deviceId } = props;
    const N = props.puzzle.grid_size;
 
+   // The image URL resized to the board's size
+   const pixelRatio = PixelRatio.get();
+   const targetMaxDimension = Math.max(board.boardWidth, board.boardHeight) * pixelRatio;
+   const boardImageUrl = buildBoardImageUrl(
+      puzzle.image_url,
+      puzzle.image_width,
+      puzzle.image_height,
+      targetMaxDimension
+   );
+
    const [state, setState] = useState<State>({
       boardArray: [],
       selected: null,
@@ -82,6 +94,8 @@ const PuzzleBoard = (props: Props) => {
    // current arrangement when it closes.
    useEffect(() => {
       let cancelled = false;
+
+      setState((prev) => ({ ...prev, loading: true }));
 
       const load = async () => {
          const saved = await getPuzzleProgress(deviceId, puzzle.id);
@@ -274,7 +288,7 @@ const PuzzleBoard = (props: Props) => {
                boardIndex={boardIndex}
                tileVal={tileVal}
                board={board}
-               imageUri={puzzle.image_url}
+               imageUri={boardImageUrl}
                gesture={createTileGesture(boardIndex)}
                selectedIndex={state.selected}
             />
@@ -290,7 +304,9 @@ const PuzzleBoard = (props: Props) => {
             pointerEvents="none"
          >
             <AnimatedImage
-               source={{ uri: puzzle.image_url }}
+               source={{ uri: boardImageUrl }}
+               cachePolicy="disk"
+               transition={200}
                style={ghostImageAnimatedStyle}
             />
          </Animated.View>
@@ -327,6 +343,9 @@ const PuzzleTile = (props: TileProps) => {
          >
             <Image
                source={{ uri: imageUri }}
+               cachePolicy="disk"
+               pointerEvents="none"
+               transition={200}
                style={[
                   {
                      width:    board.boardWidth,

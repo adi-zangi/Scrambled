@@ -6,15 +6,15 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import LevelMenu from '@/src/components/LevelMenu';
-import { getAllPuzzles, getAllPuzzleProgressForDevice } from '@/services/puzzleService';
+import { getAllPuzzles, getAllPuzzlesSolvedForDevice } from '@/services/puzzleService';
 
 jest.mock('@/services/puzzleService', () => ({
    getAllPuzzles: jest.fn(),
-   getAllPuzzleProgressForDevice: jest.fn(),
+   getAllPuzzlesSolvedForDevice: jest.fn(),
 }));
 
 const mockGetAllPuzzles = getAllPuzzles as jest.Mock;
-const mockGetAllProgress = getAllPuzzleProgressForDevice as jest.Mock;
+const mockGetAllProgress = getAllPuzzlesSolvedForDevice as jest.Mock;
 
 const PUZZLES = [
    { id: 'p1', level_number: 1, image_url: 'https://example.com/1.png', grid_size: 3 },

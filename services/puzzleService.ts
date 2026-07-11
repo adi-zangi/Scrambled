@@ -122,6 +122,24 @@ const getPuzzleSolved = async (deviceId: string, puzzleId: string): Promise<bool
 };
 
 /**
+ * Fetches solved status for every puzzle a device has progress on.
+ */
+const getAllPuzzlesSolvedForDevice = async (
+   deviceId: string
+): Promise<Pick<PuzzleProgress, 'puzzle_id' | 'solved'>[]> => {
+   const { data, error } = await supabase
+      .from('puzzle_progress')
+      .select('puzzle_id, solved')
+      .eq('device_id', deviceId);
+
+   if (error) {
+      throw new Error(`Failed to fetch solved statuses for device: ${error.message}`);
+   }
+
+   return data;
+};
+
+/**
  * Marks a puzzle as solved for a device. Creates the progress row if it
  * doesn't exist yet. Does not affect the stored progress array.
  */
@@ -166,6 +184,7 @@ export {
    getPuzzleProgress,
    getAllPuzzleProgressForDevice,
    getPuzzleSolved,
+   getAllPuzzlesSolvedForDevice,
    markPuzzleSolved,
    savePuzzleProgress,
 };

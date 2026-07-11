@@ -3,9 +3,11 @@
  * tappable grid, revealing thumbnails for solved puzzles.
  */
 
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, PixelRatio } from 'react-native';
 import React, { useEffect, useState } from 'react';
-import { getAllPuzzles, getAllPuzzleProgressForDevice } from '@/services/puzzleService';
+import { getAllPuzzles, getAllPuzzlesSolvedForDevice } from '@/services/puzzleService';
+import { ICON_SIZES, buildThumbnailUrl } from '@/src/constants/thumbnails';
+import { Image } from 'expo-image';
 
 interface LevelMenuProps {
    deviceId: string;
@@ -25,13 +27,14 @@ interface Group {
 
 const LevelMenu = ({ deviceId, onPuzzleSelected }: LevelMenuProps) => {
    const imageSize = Dimensions.get('window').width * 0.1;
+   const thumbnailSize = PixelRatio.get() >= 2 ? ICON_SIZES[1] : ICON_SIZES[0];
    const [groups, setGroups] = useState<Group[]>([]);
 
    useEffect(() => {
       const loadGroups = async () => {
          const [puzzles, progress] = await Promise.all([
             getAllPuzzles(),
-            getAllPuzzleProgressForDevice(deviceId),
+            getAllPuzzlesSolvedForDevice(deviceId),
          ]);
 
          const solvedPuzzleIds = new Set(
@@ -42,7 +45,7 @@ const LevelMenu = ({ deviceId, onPuzzleSelected }: LevelMenuProps) => {
          for (const puzzle of puzzles) {
             const Level: Level = {
                level: puzzle.level_number,
-               imageUrl: puzzle.image_url,
+               imageUrl: buildThumbnailUrl(puzzle.image_url, thumbnailSize),
                solved: solvedPuzzleIds.has(puzzle.id),
             };
             const existing = groupsByGridSize.get(puzzle.grid_size) ?? [];
@@ -58,7 +61,7 @@ const LevelMenu = ({ deviceId, onPuzzleSelected }: LevelMenuProps) => {
       };
 
       loadGroups();
-   }, [deviceId]);
+   }, [deviceId, thumbnailSize]);
 
    return (
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -83,6 +86,7 @@ const LevelMenu = ({ deviceId, onPuzzleSelected }: LevelMenuProps) => {
                            {solved ? (
                               <Image
                                  source={{ uri: imageUrl }}
+                                 cachePolicy="disk"
                                  style={{ width: imageSize, height: imageSize }}
                               />
                            ) : (

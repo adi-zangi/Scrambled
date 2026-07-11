@@ -80,6 +80,13 @@ jest.mock('react-native-gesture-handler', () => {
    };
 });
 
+jest.mock('expo-image', () => {
+   const RN = require('react-native');
+   return {
+      Image: RN.Image,
+   };
+});
+
 // Mock shuffle to return a known state for predictable tests.
 // Grid layout:
 //   0 1 2
