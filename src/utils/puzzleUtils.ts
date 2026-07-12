@@ -67,11 +67,11 @@ const useBoard = (puzzle: Puzzle): Board => {
  * Produces a shuffled copy of the tile state that is always solvable by
  * applying a number of random adjacent swaps to the solved state.
  * @param tiles - The solved tile array to shuffle (e.g. [0, 1, 2, ... N*N-1])
- * @param swaps - Number of random adjacent swaps to perform (default: 300)
+ * @param N     - The grid size (number of rows/columns). Determines swap count internally.
  * @returns A new shuffled array
  */
-const shuffle = (arr: number[], N: number): number[] => {
-  const a = [...arr];
+const shuffle = (tiles: number[], N: number): number[] => {
+  const a = [...tiles];
   const total = N * N;
   const swaps = total * 20;
 
@@ -88,9 +88,9 @@ const shuffle = (arr: number[], N: number): number[] => {
   }
 
   // Guarantee not accidentally solved
-  if (arr.every((v, i) => v === i)) {
-      [arr[0], arr[1]] = [arr[1], arr[0]];
-      [arr[N], arr[N + 1]] = [arr[N + 1], arr[N]];
+  if (a.every((v, i) => v === i)) {
+      [a[0], a[1]] = [a[1], a[0]];
+      [a[N], a[N + 1]] = [a[N + 1], a[N]];
   }
 
   return a;
