@@ -178,6 +178,21 @@ const savePuzzleProgress = async (
    }
 };
 
+/**
+ * Resets a device's progress on every puzzle: clears the saved tile
+ * arrangement to an empty array and marks each puzzle unsolved again.
+ */
+const resetAllPuzzleProgress = async (deviceId: string): Promise<void> => {
+   const { error } = await supabase
+      .from('puzzle_progress')
+      .update({ progress: [], solved: false })
+      .eq('device_id', deviceId);
+
+   if (error) {
+      throw new Error(`Failed to reset puzzle progress for device: ${error.message}`);
+   }
+};
+
 export {
    getPuzzle,
    getAllPuzzles,
@@ -187,4 +202,5 @@ export {
    getAllPuzzlesSolvedForDevice,
    markPuzzleSolved,
    savePuzzleProgress,
+   resetAllPuzzleProgress,
 };
